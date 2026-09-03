@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import React from 'react'
 
+import './offers.css'
+import './letter.css'
+
 export const metadata: Metadata = {
   title: 'Offer & New Hire Request Manager',
   robots: { index: false, follow: false },

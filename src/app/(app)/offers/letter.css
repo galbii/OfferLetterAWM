@@ -1,0 +1,89 @@
+/* Offer & New Hire Request Manager v1.6 -- offer letter stylesheet.
+ * Ported verbatim from source-1-markup-css.html (S1 lines 152-234).
+ * Plain global CSS (NOT a CSS module): generated letter HTML references these
+ * class names as strings, so they must stay byte-identical to the source.
+ */
+
+/* ===== Offer Letter ===== */
+.letter-overlay{display:flex;flex-direction:column;background:#5b6675;height:calc(100vh - 150px);min-height:520px}
+.subtabs{display:flex;gap:2px;background:#eef2f9;border-bottom:1px solid var(--line);padding:0 20px}
+.subtab{background:transparent;color:var(--muted);border:none;border-bottom:3px solid transparent;padding:11px 16px;font-weight:600;font-size:13.5px;cursor:pointer}
+.subtab:hover{color:var(--navy)}
+.subtab.active{color:var(--navy);border-bottom-color:var(--accent)}
+.subview{display:none}
+.subview.active{display:block}
+.stage-toolbar{display:flex;gap:8px;align-items:center;padding:16px 24px 6px;flex-wrap:wrap}
+.stage-toolbar .st-spacer{flex:1}
+.mass-sig{display:flex;gap:6px;align-items:center}
+.mass-sig .ms-lbl{font-size:12px;color:var(--muted);font-weight:600}
+.mass-sig select{padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;background:#fff;max-width:230px}
+.stage-filters{display:grid;grid-template-columns:36px 19% 16% 22% 1fr auto;align-items:center;padding:4px 24px 12px}
+.stage-filters .f-name,.stage-filters .f-branch,.stage-filters .f-title{width:calc(100% - 8px);max-width:none;box-sizing:border-box}
+.stage-table{table-layout:fixed;min-width:900px}
+.stage-table .c-chk{width:30px}
+.stage-table th:nth-child(2),.stage-table td:nth-child(2){width:14%}
+.stage-table th:nth-child(3),.stage-table td:nth-child(3){width:10%}
+.stage-table th:nth-child(4),.stage-table td:nth-child(4){width:14%}
+.stage-table th:nth-child(5),.stage-table td:nth-child(5){width:11%}
+.stage-table th:nth-child(6),.stage-table td:nth-child(6){width:84px}
+.stage-table th:nth-child(7),.stage-table td:nth-child(7){width:334px}   /* Actions: fixed home so buttons never overflow */
+.stage-table td{word-break:break-word}
+.stage-table .c-act .mini{padding:4px 7px;font-size:11.5px;margin-left:4px}
+.letter-toolbar{background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.letter-toolbar strong{font-size:15px}
+.letter-toolbar .lt-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.email-pref{font-size:12px;opacity:.92;display:flex;align-items:center;gap:5px;color:#fff}
+.email-pref select{padding:5px 6px;border-radius:6px;border:1px solid #2a3a5c;font-size:12px}
+.wm-ctl{display:flex;align-items:center;gap:6px;font-size:13px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:7px}
+.wm-ctl input{accent-color:#fff}
+.letter-toolbar select,.letter-toolbar input[type=date]{padding:6px 8px;border-radius:6px;border:1px solid #2a3a5c;font-size:13px}
+.letter-body-wrap{flex:1;display:grid;grid-template-columns:290px 1fr;overflow:hidden}
+.letter-options{background:#fff;border-right:1px solid var(--line);overflow:auto;padding:14px 16px}
+.letter-options h4{margin:14px 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.letter-options h4:first-child{margin-top:0}
+.lo-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.lo-row label{font-size:12.5px;font-weight:600;color:#243244}
+.lo-row select,.lo-row input[type=text],.lo-row input[type=date]{padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit}
+.lo-check{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:13px;cursor:pointer}
+.lo-check input{accent-color:var(--accent);width:15px;height:15px}
+.letter-preview-area{overflow:auto;padding:26px;background:#5b6675}
+.letter-sheet{position:relative;background:#fff;width:8.5in;min-height:11in;margin:0 auto;box-shadow:0 6px 30px rgba(0,0,0,.35);padding:0.6in 0.75in 0.9in}
+.letter-content{font-family:'Calibri','Segoe UI',Arial,sans-serif;font-size:11pt;color:#111;line-height:1.42;position:relative;z-index:2}
+.letter-table{width:100%;border-collapse:collapse}
+.letter-table>tbody>tr>td,.letter-table>tfoot>tr>td{padding:0;border:none}
+.lp-foot{text-align:center;font-size:8.5pt;color:#333;line-height:1.35;padding-top:16px}
+.letter-content .logo{width:2.5in;margin:0 0 18px}
+.letter-content .date-line{text-align:right;margin-bottom:14px}
+.letter-content p{margin:0 0 9px}
+.letter-content .addr{margin-bottom:14px}
+.letter-content .addr div{line-height:1.35}
+.letter-content h3.sec{font-size:12.5pt;font-weight:700;margin:16px 0 8px}
+.letter-content ul{margin:0 0 11px;padding-left:22px}
+.letter-content ul li{margin-bottom:4px}
+.comp-table{width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:10pt}
+.comp-table th,.comp-table td{border:1px solid #b9c2d0;padding:7px 9px;vertical-align:top;text-align:left}
+.comp-table th{background:#eef2f9;font-weight:700}
+.comp-table td:first-child{font-weight:700;width:20%}
+.comp-table td:nth-child(2){width:34%}
+.comp-plan .cp-line{margin:0 0 9px}
+.comp-plan .cp-pct{font-weight:700}
+.sig-block{margin-top:22px}
+.sig-name{margin-top:2px}
+.letter-content .ack{margin-top:26px}
+.sign-row{margin-top:34px;display:flex;justify-content:space-between;max-width:70%}
+.sign-row .line{border-top:1px solid #111;padding-top:3px;min-width:2.4in}
+.letter-print-footer{display:none;font-family:'Calibri',Arial,sans-serif;font-size:8.5pt;color:#333;text-align:center;line-height:1.35}
+.watermark-layer{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;display:none}
+.watermark-layer.on{display:block}
+.wm-inner{position:absolute;top:-25%;left:-25%;width:150%;height:150%;display:flex;flex-wrap:wrap;gap:70px 46px;transform:rotate(-30deg)}
+.wm-inner span{color:rgba(200,30,30,.12);font-size:46px;font-weight:800;letter-spacing:5px;white-space:nowrap;font-family:Arial,sans-serif}
+@media print{
+  body.printing-letter{background:#fff}
+  body.printing-letter *{visibility:hidden!important}
+  body.printing-letter #letterSheet,body.printing-letter #letterSheet *{visibility:visible!important}
+  body.printing-letter #letterSheet{position:absolute!important;left:0;top:0;box-shadow:none!important;margin:0!important;width:auto!important;min-height:0!important;padding:0!important}
+  /* never split a table row, list item, or heading across a page */
+  body.printing-letter .comp-table tr,body.printing-letter .comp-table td,body.printing-letter .cp-table tr,body.printing-letter #letterContent li,body.printing-letter #letterContent h3{break-inside:avoid!important;page-break-inside:avoid!important}
+  body.printing-letter #letterContent h3{break-after:avoid!important;page-break-after:avoid!important}
+  @page{size:letter;margin:0.55in 0.7in 0.55in}
+}
