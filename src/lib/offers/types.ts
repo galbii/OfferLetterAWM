@@ -75,12 +75,10 @@ export interface LetterConfig {
   }
 }
 
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
+
 /** Stored on a record: a deep-partial override of the defaults (deepAssign semantics). */
-export type StoredLetterConfig = {
-  [K in keyof LetterConfig]?: LetterConfig[K] extends object
-    ? Partial<LetterConfig[K]>
-    : LetterConfig[K]
-}
+export type StoredLetterConfig = DeepPartial<LetterConfig>
 
 export interface OfferRecord {
   id: string
