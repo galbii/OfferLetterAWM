@@ -79,6 +79,18 @@ export default function RequestForm() {
 
   useEffect(() => clearTimer, [])
 
+  // AUTOSAVE FLUSH — the source commits pending edits before switching records
+  // (S2 670 / 680 `if(dirty)commitCurrent(true)`). React unmounts nothing here, so
+  // the controller has to be able to reach into the form: it runs this before it
+  // changes `currentId`, while the OLD id is still current.
+  const registerPendingFlush = api.registerPendingFlush
+  useEffect(() => {
+    registerPendingFlush(() => {
+      if (dirtyRef.current) commitRef.current(false)
+    })
+    return () => registerPendingFlush(null)
+  }, [registerPendingFlush])
+
   // S2 902 / 920–922 — a real field edit stales any hand-edited letter.
   const markLetterStale = (): void => {
     const id = api.currentId
@@ -129,9 +141,9 @@ export default function RequestForm() {
     }
   }
 
+  // S3 433 — the button is bound to openLetter, which flushes and guards.
   const onLetter = (): void => {
-    if (dirtyRef.current) commit(false)
-    api.showSub('letter')
+    api.openLetter()
   }
 
   const onPrint = (): void => {
@@ -159,7 +171,10 @@ export default function RequestForm() {
     api.confirmDialog(
       'Delete request',
       'Permanently delete this request? This cannot be undone.',
-      () => api.deleteRecord(id),
+      () => {
+        api.deleteRecord(id)
+        api.toast('Request deleted.') // S2 934
+      },
     )
   }
 

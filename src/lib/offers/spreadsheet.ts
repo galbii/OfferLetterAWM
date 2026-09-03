@@ -189,7 +189,7 @@ export async function applyImport(
 /* ===================== EXPORT (S2 780–818) ===================== */
 
 // S2 779–790
-function recordsToAoa(includeMeta: boolean, recs: OfferRecord[]): (string | undefined)[][] {
+export function recordsToAoa(includeMeta: boolean, recs: OfferRecord[]): (string | undefined)[][] {
   const head: string[] = [...HEADERS]
   if (includeMeta) head.push(...META_COLS)
   const aoa: (string | undefined)[][] = [head]

@@ -133,7 +133,15 @@ export interface OffersApi {
   commitForm(data: OfferData, manual: boolean): string | null
   openRecord(id: string): void
   newRecord(): void
+  /**
+   * Register (or clear, with null) the form's pending-autosave flush.
+   * `openRecord` / `newRecord` run it before switching, which is the source's
+   * `if(dirty)commitCurrent(true)` guard (S2 670, 680).
+   */
+  registerPendingFlush(fn: (() => void) | null): void
+  /** Removes the record; the CALLER toasts (S2 934 "Request deleted." vs S3 748 "Deleted."). */
   deleteRecord(id: string): void
+  /** Bulk removal; the CALLER toasts (S3 737). */
   deleteRecords(ids: string[]): void
   duplicateRecord(data: OfferData): void
   setStage(id: string, stage: Stage): void
@@ -147,4 +155,9 @@ export interface OffersApi {
   confirmDialog(title: string, msg: string, onYes: () => void, onCancel?: () => void): void
   showView(v: View): void
   showSub(s: EditorSub): void
+  /**
+   * S3 292–293 (`currentLetterRecord` + `openLetter`): flush the form's pending
+   * edits, then show the letter sub-tab — or toast when there is no record yet.
+   */
+  openLetter(): void
 }

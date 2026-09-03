@@ -4,7 +4,9 @@
 // and reconnect overlay), tab bar (S1 334–340) with live counts (S3 576–578),
 // and the five view sections (S1 342–430, S3 616–622).
 //
-// The view bodies are placeholders that Tasks 7–9 replace one slot each.
+// Every view stays mounted and is shown/hidden by the `.view`/`.subview` classes,
+// exactly as the source does — that is what keeps the form's state (and its
+// pending autosave) alive across a tab switch.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -23,10 +25,15 @@ import {
   parseBackup,
 } from '@/lib/offers/spreadsheet'
 import { importedSids, markImported } from '@/lib/offers/storage'
-import type { OfferRecord, Stage, View } from '@/lib/offers/types'
+import type { EditorSub, OfferRecord, Stage, View } from '@/lib/offers/types'
 
+import AnalysisView from './AnalysisView'
+import LetterView from './LetterView'
 import Modal from './Modal'
 import { useOffers } from './OffersProvider'
+import RecordList from './RecordList'
+import RequestForm from './RequestForm'
+import StageTable from './StageTable'
 
 const stageOf = (r: OfferRecord): Stage => r.stage || 'pipeline'
 
@@ -35,10 +42,13 @@ export default function OfferManager() {
     records,
     currentId,
     view,
+    sub,
     addRecords,
     confirmDialog,
     newRecord,
+    openLetter,
     replaceRecords,
+    showSub,
     showView,
     toast,
   } = useOffers()
@@ -215,28 +225,33 @@ export default function OfferManager() {
 
   const viewCls = (v: View) => (view === v ? 'view active' : 'view')
   const tabCls = (v: View) => (view === v ? 'tab active' : 'tab')
+  const subViewCls = (s: EditorSub) => (sub === s ? 'subview active' : 'subview')
+  const subTabCls = (s: EditorSub) => (sub === s ? 'subtab active' : 'subtab')
 
-  /* -------- view bodies: one slot per follow-up task -------- */
+  /* ---------------- view bodies (S1 342–430) ---------------- */
 
-  // TODO(Task 8): replace with the pipeline stage table + toolbar + filters.
-  const pipelineContent = (
-    <div className="stage-empty">The pipeline table comes online in a later task.</div>
-  )
-  // TODO(Task 8): replace with the hired stage table + filters.
-  const hiredContent = (
-    <div className="stage-empty">The hired table comes online in a later task.</div>
-  )
-  // TODO(Task 8): replace with the archived stage table + filters.
-  const archivedContent = (
-    <div className="stage-empty">The archived table comes online in a later task.</div>
-  )
-  // TODO(Task 9): replace with the analysis dashboard.
-  const analysisContent = (
-    <div className="stage-empty">The analysis dashboard comes online in a later task.</div>
-  )
-  // TODO(Task 7): replace with the sub-tabs, record list, form and letter panes.
+  // S3 759 — the letter sub-tab runs openLetter(), which flushes pending form
+  // edits and refuses when there is no record yet; "New Hire Details" just shows.
   const editorContent = (
-    <div className="stage-empty">The request editor comes online in a later task.</div>
+    <>
+      <div className="subtabs" id="subtabs">
+        <button type="button" className={subTabCls('letter')} onClick={openLetter}>
+          Offer Letter
+        </button>
+        <button type="button" className={subTabCls('details')} onClick={() => showSub('details')}>
+          New Hire Details
+        </button>
+      </div>
+      <div className={subViewCls('letter')} id="sub-letter">
+        <LetterView />
+      </div>
+      <div className={subViewCls('details')} id="sub-details">
+        <div className="wrap">
+          <RecordList />
+          <RequestForm />
+        </div>
+      </div>
+    </>
   )
 
   return (
@@ -307,10 +322,19 @@ export default function OfferManager() {
         </button>
       </nav>
 
-      <section className={viewCls('pipeline')}>{pipelineContent}</section>
-      <section className={viewCls('hired')}>{hiredContent}</section>
-      <section className={viewCls('archived')}>{archivedContent}</section>
-      <section className={viewCls('analysis')}>{analysisContent}</section>
+      {/* StageTable renders its own BulkToolbar for the pipeline stage. */}
+      <section className={viewCls('pipeline')}>
+        <StageTable stage="pipeline" />
+      </section>
+      <section className={viewCls('hired')}>
+        <StageTable stage="hired" />
+      </section>
+      <section className={viewCls('archived')}>
+        <StageTable stage="archived" />
+      </section>
+      <section className={viewCls('analysis')}>
+        <AnalysisView />
+      </section>
       <section className={viewCls('editor')}>{editorContent}</section>
 
       {/* S3 774 — Import from Code / Link */}

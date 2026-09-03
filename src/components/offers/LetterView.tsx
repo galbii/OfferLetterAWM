@@ -144,6 +144,19 @@ function cloneLetter(L: LetterConfig): LetterConfig {
   return JSON.parse(JSON.stringify(L)) as LetterConfig
 }
 
+/**
+ * Identity of the letter state stored on a record. The view compares this against
+ * what it last wrote itself, so a write from ANOTHER component (bulk signatory
+ * assign, S3 609–610) is detected and re-resolved instead of being shown stale.
+ */
+function letterSig(
+  id: string | null,
+  letter: OfferRecord['letter'],
+  html: OfferRecord['letterHtml'],
+): string {
+  return id ? id + '\u0000' + JSON.stringify([letter || null, html || null]) : ''
+}
+
 export default function LetterView(): React.JSX.Element | null {
   const api = useOffers()
   const rec: OfferRecord | null = api.records.find((r) => r.id === api.currentId) || null
@@ -162,6 +175,8 @@ export default function LetterView(): React.JSX.Element | null {
   const recRef = useRef<OfferRecord | null>(null)
   const apiRef = useRef<OffersApi>(api)
   const initedFor = useRef<string | null>(null)
+  /** `letterSig` of the last letter state THIS view wrote or loaded. */
+  const ownSigRef = useRef<string>('')
   const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const regenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -171,6 +186,17 @@ export default function LetterView(): React.JSX.Element | null {
     recRef.current = rec
     apiRef.current = api
   })
+
+  /** patchRecord + remember the resulting letter state as ours, so the
+   *  external-change watcher below does not mistake it for someone else's write. */
+  const patchSelf = useCallback((id: string, patch: Partial<OfferRecord>) => {
+    const a = apiRef.current
+    const cur = a.records.find((x) => x.id === id)
+    const nextLetter = 'letter' in patch ? patch.letter : cur ? cur.letter : undefined
+    const nextHtml = 'letterHtml' in patch ? patch.letterHtml : cur ? cur.letterHtml : undefined
+    ownSigRef.current = letterSig(id, nextLetter, nextHtml)
+    a.patchRecord(id, patch)
+  }, [])
 
   const setLetter = useCallback((next: LetterConfig) => {
     LRef.current = next
@@ -206,11 +232,11 @@ export default function LetterView(): React.JSX.Element | null {
       if (!r) return
       htmlRef.current = letterWrap(generateLetterHTML(r, nextL))
       setContentKey((k) => k + 1)
-      a.patchRecord(recId, { letterHtml: null, letterStale: false, letter: nextL })
+      patchSelf(recId, { letterHtml: null, letterStale: false, letter: nextL })
       setStatus('idle')
       window.setTimeout(renderWatermark, 0)
     },
-    [renderWatermark],
+    [patchSelf, renderWatermark],
   )
 
   // S3 293–298 (openLetter): resolve the letter, keep hand-edits only when the fields
@@ -230,6 +256,7 @@ export default function LetterView(): React.JSX.Element | null {
     LRef.current = resolved
     setL(resolved)
     if (letterEditIsCurrent(r)) {
+      ownSigRef.current = letterSig(recId, r.letter, r.letterHtml)
       htmlRef.current = r.letterHtml || ''
       setContentKey((k) => k + 1)
       setStatus('saved')
@@ -241,6 +268,31 @@ export default function LetterView(): React.JSX.Element | null {
         a.toast('Details changed since your edits — letter rebuilt from the current fields.')
     }
   }, [recId, regen, renderWatermark])
+
+  // An open letter must follow the record when someone ELSE rewrites its letter
+  // state — bulk signatory assign (S3 609–610) patches `letter` and `letterHtml`
+  // on records that may be the one on screen. Anything this view wrote itself is
+  // recorded in `ownSigRef` and ignored here.
+  const recSig = letterSig(recId, rec ? rec.letter : undefined, rec ? rec.letterHtml : undefined)
+  useEffect(() => {
+    if (!recId || initedFor.current !== recId) return
+    if (recSig === ownSigRef.current) return
+    ownSigRef.current = recSig
+    const a = apiRef.current
+    const r = a.records.find((x) => x.id === recId)
+    if (!r) return
+    const resolved = resolveLetter(r)
+    LRef.current = resolved
+    setL(resolved)
+    if (letterEditIsCurrent(r)) {
+      htmlRef.current = r.letterHtml || ''
+      setContentKey((k) => k + 1)
+      setStatus('saved')
+      window.setTimeout(renderWatermark, 0)
+    } else {
+      regen(resolved, recId)
+    }
+  }, [recId, recSig, regen, renderWatermark])
 
   // S3 509–510 — remembered email-client preference (client-only read).
   useEffect(() => {
@@ -266,10 +318,10 @@ export default function LetterView(): React.JSX.Element | null {
       const html = contentRef.current ? contentRef.current.innerHTML : ''
       const patch: Partial<OfferRecord> = { letterHtml: html, letterStale: false }
       if (LRef.current) patch.letter = LRef.current
-      apiRef.current.patchRecord(r.id, patch)
+      patchSelf(r.id, patch)
       setStatus('saved')
     }, 500)
-  }, [])
+  }, [patchSelf])
 
   // S3 454–458 — an option change on a hand-edited letter prompts the discard confirm.
   const onOpt = useCallback(
@@ -281,7 +333,7 @@ export default function LetterView(): React.JSX.Element | null {
         const next = cloneLetter(cur)
         setByPath(next, path, val)
         setLetter(next)
-        apiRef.current.patchRecord(r.id, { letter: next, letterHtml: null })
+        patchSelf(r.id, { letter: next, letterHtml: null })
         if (regenTimer.current) clearTimeout(regenTimer.current)
         regenTimer.current = setTimeout(() => {
           regen(next, r.id)
@@ -297,7 +349,7 @@ export default function LetterView(): React.JSX.Element | null {
         )
       } else apply()
     },
-    [regen, setLetter],
+    [patchSelf, regen, setLetter],
   )
 
   // S3 435–438 — Regenerate, confirming first when the letter was hand-edited.
@@ -329,10 +381,10 @@ export default function LetterView(): React.JSX.Element | null {
       const next = cloneLetter(cur)
       next.watermark = { on, text: (cur.watermark && cur.watermark.text) || 'SAMPLE' }
       setLetter(next)
-      apiRef.current.patchRecord(r.id, { letter: next })
+      patchSelf(r.id, { letter: next })
       renderWatermark()
     },
-    [renderWatermark, setLetter],
+    [patchSelf, renderWatermark, setLetter],
   )
 
   // S3 443 — print only the sheet.

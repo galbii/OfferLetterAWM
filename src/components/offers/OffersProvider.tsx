@@ -17,10 +17,19 @@ import React, {
   useState,
 } from 'react'
 
+import { parseIntakeCode, submissionToRecord } from '@/lib/offers/intake'
 import { missingRequired, nowIso, uid } from '@/lib/offers/schema'
-import { loadRecords, persistRecords } from '@/lib/offers/storage'
+import {
+  INBOX_KEY,
+  importedSids,
+  loadRecords,
+  markImported,
+  persistRecords,
+  readAndClearInbox,
+} from '@/lib/offers/storage'
 import type {
   EditorSub,
+  IntakeSubmission,
   OfferData,
   OfferRecord,
   OffersApi,
@@ -63,6 +72,8 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
   // works from a stale closure.
   const recordsRef = useRef<OfferRecord[]>([])
   const currentIdRef = useRef<string | null>(null)
+  /** The mounted form's debounced-autosave flush (S2 670 / 680 `if(dirty)commitCurrent(true)`). */
+  const pendingFlushRef = useRef<(() => void) | null>(null)
 
   // Records hydrate here, never during SSR render — localStorage does not exist
   // on the server and an initial mismatch would break hydration.
@@ -91,6 +102,19 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
     setCurrentId(id)
   }, [])
 
+  const registerPendingFlush = useCallback((fn: (() => void) | null) => {
+    pendingFlushRef.current = fn
+  }, [])
+
+  /**
+   * Commit whatever the form has pending BEFORE the current record changes, so a
+   * switch inside the 600ms autosave window still lands on the OLD record.
+   */
+  const flushPending = useCallback(() => {
+    const fn = pendingFlushRef.current
+    if (fn) fn()
+  }, [])
+
   const showView = useCallback((v: View) => {
     setView(v)
     scrollTop()
@@ -100,6 +124,18 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
     setSub(s)
     scrollTop()
   }, [])
+
+  // S3 292–293 — currentLetterRecord() commits first; openLetter() refuses when
+  // there is still no record to write a letter for.
+  const openLetter = useCallback(() => {
+    flushPending()
+    if (!currentIdRef.current) {
+      toast('Add the new hire details first, then generate the letter.', true)
+      return
+    }
+    setSub('letter')
+    scrollTop()
+  }, [flushPending, toast])
 
   // S2 618–636 (commitCurrent). `manual` is the source's `!isAuto`.
   const commitForm = useCallback(
@@ -138,39 +174,40 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
   const openRecord = useCallback(
     (id: string) => {
       if (!recordsRef.current.some((r) => r.id === id)) return
+      flushPending() // S2 670
       setCurrent(id)
       scrollTop()
     },
-    [setCurrent],
+    [flushPending, setCurrent],
   )
 
   // S2 679–685 plus S3 758: "+ New Request" always lands on the details sub-tab.
   const newRecord = useCallback(() => {
+    flushPending() // S2 680
     setCurrent(null)
     setView('editor')
     setSub('details')
     scrollTop()
-  }, [setCurrent])
+  }, [flushPending, setCurrent])
 
-  // S3 748. The editor's own delete (S2 936–939) toasts "Request deleted." —
-  // that caller re-toasts after this returns.
+  // The two delete paths use different words — S2 936–939 says "Request deleted.",
+  // S3 748 says "Deleted." — so the toast belongs to the caller, not here.
   const deleteRecord = useCallback(
     (id: string) => {
       commit(recordsRef.current.filter((r) => r.id !== id))
       if (currentIdRef.current === id) setCurrent(null)
-      toast('Deleted.')
     },
-    [commit, setCurrent, toast],
+    [commit, setCurrent],
   )
 
-  // S3 737 (bulk delete from the pipeline table).
+  // S3 737 (bulk delete from the pipeline table). As with `deleteRecord`, the
+  // caller owns the toast so the message is written in exactly one place.
   const deleteRecords = useCallback(
     (ids: string[]) => {
       commit(recordsRef.current.filter((r) => ids.indexOf(r.id) < 0))
       if (currentIdRef.current && ids.indexOf(currentIdRef.current) >= 0) setCurrent(null)
-      toast('Deleted ' + ids.length + ' record' + (ids.length !== 1 ? 's' : '') + '.')
     },
-    [commit, setCurrent, toast],
+    [commit, setCurrent],
   )
 
   // S2 940–944. The caller commits any pending edit first, then hands us the
@@ -252,6 +289,71 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
     [],
   )
 
+  /* ===================== INTAKE SYNC (S3 763–773) ===================== */
+
+  /** addSubmission (S3 766–769) for a batch: dedupe by sid, prepend, persist. */
+  const addSubmissions = useCallback(
+    (subs: IntakeSubmission[]): number => {
+      const seen = importedSids()
+      const fresh: OfferRecord[] = []
+      subs.forEach((sub) => {
+        if (!sub || !sub.data) return
+        if (sub.sid && seen.indexOf(sub.sid) >= 0) return
+        if (sub.sid) seen.push(sub.sid)
+        fresh.push(submissionToRecord(sub))
+        markImported(sub.sid)
+      })
+      if (!fresh.length) return 0
+      // S3 767 unshifts one at a time, so the LAST submission ends up first.
+      addRecords(fresh.slice().reverse())
+      return fresh.length
+    },
+    [addRecords],
+  )
+
+  // S3 771–773 — drain the same-browser inbox on mount, every 2.5s, and whenever
+  // another tab writes it. `readAndClearInbox` clears storage as it reads, so the
+  // drained rows must be committed immediately — `addRecords` persists synchronously.
+  useEffect(() => {
+    const drain = (): void => {
+      const n = addSubmissions(readAndClearInbox())
+      if (n) toast(n + ' new request' + (n !== 1 ? 's' : '') + ' synced from the intake form.')
+    }
+    drain()
+    const timer = window.setInterval(drain, 2500)
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === INBOX_KEY) drain()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [addSubmissions, toast])
+
+  // S3 772 — a prefilled `#rec=…` link imports once, then the hash is cleaned up.
+  useEffect(() => {
+    const m = (window.location.hash || '').match(/rec=([A-Za-z0-9_-]+)/)
+    if (!m) return
+    const sub = parseIntakeCode(m[1])
+    try {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {
+      /* nothing to clean up */
+    }
+    setView('pipeline')
+    if (!sub) {
+      toast('Could not read that code.', true)
+      return
+    }
+    const n = addSubmissions([sub])
+    toast(
+      n
+        ? 'Imported ' + (sub.data.employeeName || 'request') + '.'
+        : 'That request was already imported.',
+    )
+  }, [addSubmissions, toast])
+
   const api = useMemo<OffersApi>(
     () => ({
       records,
@@ -261,6 +363,7 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       commitForm,
       openRecord,
       newRecord,
+      registerPendingFlush,
       deleteRecord,
       deleteRecords,
       duplicateRecord,
@@ -272,6 +375,7 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       confirmDialog,
       showView,
       showSub,
+      openLetter,
     }),
     [
       records,
@@ -281,6 +385,7 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       commitForm,
       openRecord,
       newRecord,
+      registerPendingFlush,
       deleteRecord,
       deleteRecords,
       duplicateRecord,
@@ -292,6 +397,7 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       confirmDialog,
       showView,
       showSub,
+      openLetter,
     ],
   )
 
