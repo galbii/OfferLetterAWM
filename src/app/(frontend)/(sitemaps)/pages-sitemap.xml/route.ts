@@ -42,12 +42,14 @@ const getPagesSitemap = unstable_cache(
       },
     ]
 
+    // `/` serves the (noindex) Offer & New Hire Request Manager, not the CMS page
+    // with slug `home`, so that page has no reachable URL and stays out of the sitemap.
     const sitemap = results.docs
       ? results.docs
-          .filter((page) => Boolean(page?.slug))
+          .filter((page) => Boolean(page?.slug) && page?.slug !== 'home')
           .map((page) => {
             return {
-              loc: page?.slug === 'home' ? `${SITE_URL}/` : `${SITE_URL}/${page?.slug}`,
+              loc: `${SITE_URL}/${page?.slug}`,
               lastmod: page.updatedAt || dateFallback,
             }
           })

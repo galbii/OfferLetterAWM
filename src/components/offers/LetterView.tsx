@@ -241,12 +241,20 @@ export default function LetterView(): React.JSX.Element | null {
 
   // S3 293–298 (openLetter): resolve the letter, keep hand-edits only when the fields
   // are unchanged, otherwise rebuild and say so.
+  //
+  // In the source this ran inside openLetter() alone. Here the view is always
+  // mounted (the sub-tabs only toggle visibility), so it must be gated on the
+  // letter sub-tab actually being on screen — otherwise merely clicking Edit on a
+  // record with a stale letter would silently discard the hand edits and toast
+  // about it while the user is looking at the details form.
   const recId = rec ? rec.id : null
+  const letterActive = api.view === 'editor' && api.sub === 'letter'
   useEffect(() => {
     if (!recId) {
       initedFor.current = null
       return
     }
+    if (!letterActive) return
     if (initedFor.current === recId) return
     const a = apiRef.current
     const r = a.records.find((x) => x.id === recId)
@@ -267,7 +275,7 @@ export default function LetterView(): React.JSX.Element | null {
       if (wasEdited)
         a.toast('Details changed since your edits — letter rebuilt from the current fields.')
     }
-  }, [recId, regen, renderWatermark])
+  }, [letterActive, recId, regen, renderWatermark])
 
   // An open letter must follow the record when someone ELSE rewrites its letter
   // state — bulk signatory assign (S3 609–610) patches `letter` and `letterHtml`

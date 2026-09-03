@@ -15,7 +15,6 @@ import { parseIntakeCode, submissionToRecord } from '@/lib/offers/intake'
 import { offerPacketHTML } from '@/lib/offers/letter-exports'
 import {
   BACKUP_FILENAME,
-  applyImport,
   backupRecordsToRecords,
   buildBackupBlob,
   downloadBlob,
@@ -47,7 +46,7 @@ export default function OfferManager() {
     confirmDialog,
     newRecord,
     openLetter,
-    replaceRecords,
+    importSpreadsheet,
     showSub,
     showView,
     toast,
@@ -138,8 +137,10 @@ export default function OfferManager() {
       input.value = ''
       if (!file) return
       try {
-        const result = await applyImport(records, await file.arrayBuffer())
-        replaceRecords(result.records)
+        // The provider owns the merge: it re-reads its live record list after the
+        // parse, so a submission drained by the 2.5s intake poller mid-import is
+        // not clobbered by a stale write-back.
+        const result = await importSpreadsheet(await file.arrayBuffer())
         const parts: string[] = []
         if (result.added) parts.push(result.added + ' added')
         if (result.updated) parts.push(result.updated + ' updated')
@@ -155,7 +156,7 @@ export default function OfferManager() {
         toast(err instanceof Error ? err.message : 'Could not read file.', true)
       }
     },
-    [records, replaceRecords, toast],
+    [importSpreadsheet, toast],
   )
 
   // S2 872–878 / 964–968 — restore from a backup file.

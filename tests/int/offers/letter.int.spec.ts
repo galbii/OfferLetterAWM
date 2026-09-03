@@ -38,10 +38,11 @@ test('resolveLetter merges stored options but re-derives rows', () => {
   expect(L.rows.base.wyr).toBe('$52,000 annually')
 })
 
-test('generateLetterHTML contains name, logo path, comp table, signatory', () => {
+test('generateLetterHTML contains name, inline logo, comp table, signatory', () => {
   const r = rec({ employeeName: 'Mickey Mouse', position: 'Processor', employmentType: 'Full Time - Operations', baseAnnual: '$52,000', fullAddress: '1313 Disneyland Dr, Anaheim, CA 92802' })
   const html = generateLetterHTML(r, resolveLetter(r))
-  expect(html).toContain('/offers/awm-logo.png')
+  // The letterhead must be inlined (S3 34) so offline exports still show it.
+  expect(html).toContain('<img class="logo" src="data:image/png;base64,')
   expect(html).toContain('Mickey Mouse')
   expect(html).toContain('Base Salary')
   expect(html).toContain('Benefits Package')

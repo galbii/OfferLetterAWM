@@ -6,7 +6,7 @@
 //
 // Deviation 2 (globals → params): the source read module globals `L` and `curRec`.
 // Every ported function takes what it needs explicitly.
-// Deviation 4: the base64 logo constant is replaced by a public asset path.
+// The base64 logo constant lives in ./logo.ts (generated from the same PNG).
 
 import type {
   LetterConfig,
@@ -16,6 +16,7 @@ import type {
   SignatoryKey,
   StoredLetterConfig,
 } from '@/lib/offers/types'
+import { AWM_LOGO_DATA_URI } from '@/lib/offers/logo'
 import {
   article,
   esc,
@@ -42,8 +43,9 @@ import {
   isCommissionedRec,
 } from '@/lib/offers/calc'
 
-// Deviation 4 — S3 34 was a base64 data URI; the asset now lives in /public/offers.
-export const AWM_LOGO_SRC = '/offers/awm-logo.png'
+// S3 34 — the letterhead is inlined as a data URI so exported Word docs and HTML
+// packets render it when opened from disk or an email client.
+export const AWM_LOGO_SRC = AWM_LOGO_DATA_URI
 
 /* --- canonical fixed language (verbatim from reference letters) --- */
 // S3 36–53

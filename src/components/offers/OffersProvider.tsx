@@ -18,6 +18,7 @@ import React, {
 } from 'react'
 
 import { parseIntakeCode, submissionToRecord } from '@/lib/offers/intake'
+import { applyImport } from '@/lib/offers/spreadsheet'
 import { missingRequired, nowIso, uid } from '@/lib/offers/schema'
 import {
   INBOX_KEY,
@@ -29,10 +30,12 @@ import {
 } from '@/lib/offers/storage'
 import type {
   EditorSub,
+  ImportResult,
   IntakeSubmission,
   OfferData,
   OfferRecord,
   OffersApi,
+  RecordPatch,
   RecordStatus,
   Stage,
   View,
@@ -262,9 +265,25 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
     [commit],
   )
 
-  const replaceRecords = useCallback(
-    (recs: OfferRecord[]) => {
-      commit(recs)
+  /**
+   * S2 946–953 — spreadsheet import. The merge runs HERE, against
+   * `recordsRef.current`, rather than against a component's render snapshot: the
+   * 2.5s intake poller clears the inbox as it drains it, so a submission that
+   * lands while the file is being parsed exists only in `records` — a caller that
+   * computed the merge from a stale snapshot and then replaced the whole list
+   * would silently discard it.
+   *
+   * `applyImport` awaits `import('xlsx')` internally, and that first load is the
+   * one place a timer callback can interleave. Warming the module registry before
+   * the snapshot means the ref is read and committed without ever yielding to the
+   * macrotask queue in between.
+   */
+  const importSpreadsheet = useCallback(
+    async (fileData: ArrayBuffer): Promise<ImportResult> => {
+      await import('xlsx')
+      const result = await applyImport(recordsRef.current, fileData)
+      commit(result.records)
+      return result
     },
     [commit],
   )
@@ -277,6 +296,27 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       const next = list.slice()
       next[idx] = { ...next[idx], ...patch, id: next[idx].id }
       commit(next)
+    },
+    [commit],
+  )
+
+  /**
+   * Batch form of `patchRecord`. Bulk actions (S3 604–612 signatory assign) touch
+   * every selected row; patching one at a time re-serialized and re-wrote the whole
+   * record list per id, which is O(N²) over the selection. One commit instead.
+   */
+  const patchRecords = useCallback(
+    (patches: RecordPatch[]) => {
+      if (!patches.length) return
+      const next = recordsRef.current.slice()
+      let touched = false
+      patches.forEach((p) => {
+        const idx = next.findIndex((r) => r.id === p.id)
+        if (idx < 0) return
+        next[idx] = { ...next[idx], ...p.patch, id: next[idx].id }
+        touched = true
+      })
+      if (touched) commit(next)
     },
     [commit],
   )
@@ -369,8 +409,9 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       duplicateRecord,
       setStage,
       addRecords,
-      replaceRecords,
+      importSpreadsheet,
       patchRecord,
+      patchRecords,
       toast,
       confirmDialog,
       showView,
@@ -391,8 +432,9 @@ export function OffersProvider({ children }: { children: React.ReactNode }) {
       duplicateRecord,
       setStage,
       addRecords,
-      replaceRecords,
+      importSpreadsheet,
       patchRecord,
+      patchRecords,
       toast,
       confirmDialog,
       showView,

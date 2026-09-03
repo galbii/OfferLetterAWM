@@ -1,3 +1,28 @@
+# Offer & New Hire Request Manager
+
+This repo is the **Offer & New Hire Request Manager** — an offer-letter builder and
+new-hire request pipeline for All Western Mortgage — running on top of the Payload
+Website Template.
+
+| Route | What serves it |
+|-------|----------------|
+| `/` | The Offer Manager app (`src/app/(app)`). Marked `noindex`. |
+| `/admin` | The Payload CMS admin panel. |
+| `/<slug>` | CMS Pages, Posts, search, sitemaps — everything the template ships with. |
+
+Two things to know:
+
+- **`/` shadows any CMS page with slug `home`.** The app owns the root route, so a
+  Page document with that slug has no reachable URL and is filtered out of
+  `pages-sitemap.xml`. Give CMS home content a different slug.
+- **Offer records live in the browser's `localStorage`, not in Mongo.** Nothing in
+  the app writes to Payload yet; export/backup (`.xlsx`, `.csv`, `.json`) is the
+  only way data leaves a machine. The CMS collections below are unrelated to it.
+
+Everything from here down is the upstream template documentation.
+
+---
+
 # Payload Website Template
 
 This is the official [Payload Website Template](https://github.com/payloadcms/payload/blob/main/templates/website). Use it to power websites, blogs, or portfolios from small to enterprise. This repo includes a fully-working backend, enterprise-grade admin panel, and a beautifully designed, production-ready website.

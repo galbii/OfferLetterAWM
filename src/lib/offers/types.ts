@@ -124,6 +124,12 @@ export interface WatermarkOpt { on: boolean; text: string }
  * (Tasks 7–9). Task 6 implements it; consumers must not reach around it
  * to mutate records.
  */
+/** One entry of a `patchRecords` batch. */
+export interface RecordPatch {
+  id: string
+  patch: Partial<OfferRecord>
+}
+
 export interface OffersApi {
   records: OfferRecord[]
   currentId: string | null
@@ -147,10 +153,17 @@ export interface OffersApi {
   setStage(id: string, stage: Stage): void
   /** Prepend records (import/restore/intake paths). */
   addRecords(recs: OfferRecord[]): void
-  /** Full replacement (spreadsheet import merge result). */
-  replaceRecords(recs: OfferRecord[]): void
+  /**
+   * Parse a spreadsheet and merge it into the CURRENT record list in one commit.
+   * The merge must happen inside the provider: doing it from a component snapshot
+   * races the 2.5s intake poller, which clears the inbox as it reads, so any
+   * submission drained mid-import would be dropped by the write-back.
+   */
+  importSpreadsheet(fileData: ArrayBuffer): Promise<ImportResult>
   /** Merge a patch into one record (letter/letterHtml/letterStale/stage) and persist. */
   patchRecord(id: string, patch: Partial<OfferRecord>): void
+  /** Merge many patches in a SINGLE commit — one serialize + one localStorage write. */
+  patchRecords(patches: RecordPatch[]): void
   toast(msg: string, err?: boolean): void
   confirmDialog(title: string, msg: string, onYes: () => void, onCancel?: () => void): void
   showView(v: View): void

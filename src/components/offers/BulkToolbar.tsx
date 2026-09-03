@@ -11,7 +11,7 @@ import { SIGNATORY, swapSigInHtml } from '@/lib/offers/letter'
 import { letterDocHTML } from '@/lib/offers/letter-exports'
 import { letterToPdfBytes } from '@/lib/offers/pdf'
 import { downloadBlob, exportSelectedCsv } from '@/lib/offers/spreadsheet'
-import type { OfferRecord, SignatoryKey, WatermarkOpt } from '@/lib/offers/types'
+import type { OfferRecord, RecordPatch, SignatoryKey, WatermarkOpt } from '@/lib/offers/types'
 import { makeZip, type ZipFile } from '@/lib/offers/zip'
 
 import { useOffers } from './OffersProvider'
@@ -61,6 +61,9 @@ export default function BulkToolbar({
     let count = 0
     let patched = 0
     let custom = 0
+    // One batched commit: patching per id re-serialized and re-persisted the whole
+    // record list once per selected row.
+    const batch: RecordPatch[] = []
     ids.forEach((id) => {
       const rec = recFor(id)
       if (!rec) return
@@ -74,9 +77,10 @@ export default function BulkToolbar({
           custom++
         }
       }
-      api.patchRecord(id, patch)
+      batch.push({ id, patch })
       count++
     })
+    api.patchRecords(batch)
     let msg =
       'Signer set to ' + sg.name + ' on ' + count + ' request' + plural(count, '', 's') + '.'
     if (patched)
