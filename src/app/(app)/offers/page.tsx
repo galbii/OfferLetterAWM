@@ -1,3 +1,12 @@
+import React from 'react'
+
+import OfferManager from '@/components/offers/OfferManager'
+import { OffersProvider } from '@/components/offers/OffersProvider'
+
 export default function OffersPage() {
-  return <main style={{ padding: 40 }}>Offer Manager — under construction</main>
+  return (
+    <OffersProvider>
+      <OfferManager />
+    </OffersProvider>
+  )
 }
